@@ -2,7 +2,7 @@
 
 import styles from './page.module.css'
 import { FormEvent, useCallback, useState } from 'react'
-import { ChatGPTAPI } from 'chatgpt'
+import { ChatGPTAPI, ChatMessage } from 'chatgpt'
 
 const preprompt =
 `
@@ -38,7 +38,45 @@ const docFormat =
 </html>
 `
 
+type RequestResponsePair = {
+  request: string,
+  response?: ChatMessage,
+}
+
+class Conversation {
+  api: ChatGPTAPI
+  requestOpts?: object
+  messages: RequestResponsePair[] = []
+
+  constructor (api: ChatGPTAPI, requestOpts?: object) {
+    this.api = api
+    this.requestOpts = requestOpts
+  }
+
+  async sendMessage (message: string) {
+    const thisMessagePair: RequestResponsePair = { request: message }
+    this.messages.push(thisMessagePair)
+    const response = await this.api.sendMessage(message, {
+      ...this.requestOpts,
+      parentMessageId: this.lastMessage?.response?.id,
+    })
+    thisMessagePair.response = response
+    return response
+  }
+
+  get lastMessage () {
+    return this.messages[this.messages.length - 1]
+  }
+
+  fork() {
+    const convo = new Conversation(this.api, this.requestOpts)
+    convo.messages = [...this.messages]
+    return convo
+  }
+} 
+
 let api: ChatGPTAPI
+let convo: Conversation
 // client only / no pre-rendering
 if (typeof self !== 'undefined') {
   const apiKey = new URLSearchParams(location.search).get('apiKey')
@@ -50,8 +88,13 @@ if (typeof self !== 'undefined') {
       // temperature: 0.5,
       // top_p: 0.8
     },
+    debug: true,
     // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
     fetch: self.fetch.bind(self),
+  })
+  // track messages
+  convo = new Conversation(api, {
+    systemMessage: preprompt,
   })
 }
 
@@ -70,10 +113,7 @@ export default function Home() {
   const processPrompt = async (prompt: string) => {
     // ask ai
     console.log(`prompt: ${prompt}`)
-    const res = await api.sendMessage(prompt, {
-      systemMessage: preprompt,
-    })
-    console.log(res.text)
+    const res = await convo.sendMessage(prompt)
     // format response
     const formattedPageDoc = docFormat.replace('__RESPONSE__', res.text)
     setPageDoc(formattedPageDoc)
