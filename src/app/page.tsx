@@ -26,6 +26,11 @@ const docFormat =
   <head>
     <meta charset="utf-8">
     <title>hyper prompt</title>
+    <style>
+    a {
+      text-decoration: none;
+    }
+    </style>
   </head>
   <body>
     __RESPONSE__
@@ -61,8 +66,9 @@ export default function Home() {
   const processPrompt = async (prompt: string) => {
     // ask ai
     console.log(`prompt: ${prompt}`)
-    const formattedPrompt = `${preprompt}${prompt}`
-    const res = await api.sendMessage(formattedPrompt)
+    const res = await api.sendMessage(prompt, {
+      systemMessage: preprompt,
+    })
     console.log(res.text)
     // format response
     const formattedPageDoc = docFormat.replace('__RESPONSE__', res.text)
@@ -71,7 +77,6 @@ export default function Home() {
 
   const updateIframeDoc = useCallback((iframeElement: HTMLIFrameElement) => {
     const frameGlobal = iframeElement.contentWindow
-    console.log('preparing aiPrompt')
     // @ts-ignore
     frameGlobal.aiPrompt = (newPrompt: string) => {
       const accepted = confirm(`the ai prompt is:\n${newPrompt}`)
