@@ -8,7 +8,7 @@ const preprompt =
 `
 Respond only with a single HTML fragment to be placed inside a <body>.
 Do not respond with any other content.
-Do not put the HTML in a frame.
+Do not put the HTML in a frame or backticks.
 Do not reference any external resources.
 You may use javascript to allow the user easily ask premade follow up questions.
 \`aiPrompt(promptString)\` will be available in the global scope.
@@ -33,6 +33,19 @@ const docFormat =
 </html>
 `
 
+const apiKey = new URLSearchParams(location.search).get('apiKey')
+if (!apiKey) throw new Error('apiKey not found in query string')
+const api = new ChatGPTAPI({
+  apiKey,
+  completionParams: {
+    model: 'gpt-4',
+    // temperature: 0.5,
+    // top_p: 0.8
+  },
+  // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
+  fetch: self.fetch.bind(self),
+})
+
 export default function Home() {
   const [pageDoc, setPageDoc] = useState('')
   const [promptInput, setPromptInput] = useState('')
@@ -47,18 +60,6 @@ export default function Home() {
 
   const processPrompt = async (prompt: string) => {
     // ask ai
-    const apiKey = new URLSearchParams(location.search).get('apiKey')
-    if (!apiKey) throw new Error('apiKey not found in query string')
-    const api = new ChatGPTAPI({
-      apiKey,
-      completionParams: {
-        model: 'gpt-4',
-        // temperature: 0.5,
-        // top_p: 0.8
-      },
-      // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
-      fetch: self.fetch.bind(self),
-    })
     console.log(`prompt: ${prompt}`)
     const formattedPrompt = `${preprompt}${prompt}`
     const res = await api.sendMessage(formattedPrompt)
