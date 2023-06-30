@@ -38,18 +38,22 @@ const docFormat =
 </html>
 `
 
-const apiKey = new URLSearchParams(location.search).get('apiKey')
-if (!apiKey) throw new Error('apiKey not found in query string')
-const api = new ChatGPTAPI({
-  apiKey,
-  completionParams: {
-    model: 'gpt-4',
-    // temperature: 0.5,
-    // top_p: 0.8
-  },
-  // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
-  fetch: self.fetch.bind(self),
-})
+let api: ChatGPTAPI
+// client only / no pre-rendering
+if (typeof self !== 'undefined') {
+  const apiKey = new URLSearchParams(location.search).get('apiKey')
+  if (!apiKey) throw new Error('apiKey not found in query string')
+  api = new ChatGPTAPI({
+    apiKey,
+    completionParams: {
+      model: 'gpt-4',
+      // temperature: 0.5,
+      // top_p: 0.8
+    },
+    // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
+    fetch: self.fetch.bind(self),
+  })
+}
 
 export default function Home() {
   const [pageDoc, setPageDoc] = useState('')
