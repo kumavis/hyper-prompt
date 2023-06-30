@@ -55,10 +55,10 @@ export default function Home() {
         model: 'gpt-4',
         // temperature: 0.5,
         // top_p: 0.8
-      }
+      },
+      // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
+      fetch: self.fetch.bind(self),
     })
-    // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
-    api._fetch = self.fetch.bind(self)
     console.log(`prompt: ${prompt}`)
     const formattedPrompt = `${preprompt}${prompt}`
     const res = await api.sendMessage(formattedPrompt)
