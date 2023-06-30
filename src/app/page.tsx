@@ -16,6 +16,8 @@ If your answer contains a list (<ol>), you should ALWAYS use \`aiPrompt\` to pro
 For example, if the prompt is "how to fix a car", you may respond with "<ol><li><a href="javascript:aiPrompt('how to change the oil?')">change the oil"</a></li><li><a href="javascript:aiPrompt('how to change the tires?')">change the tires</a></li></ol>".
 Only call \`aiPrompt\` in response to a user interaction.
 When possible implement an interactive widget or animated simulation, draw a canvas image or diagram.
+Always include additional prompts to relevant topics and follow up questions.
+If you need more information from the user, create a form with a submit button that calls \`aiPrompt\` with the user input.
 
 In the html doc, respond to the following query:
 `
