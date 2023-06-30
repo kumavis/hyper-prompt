@@ -1,7 +1,7 @@
 "use client"
 
 import styles from './page.module.css'
-import { useCallback, useState } from 'react'
+import { FormEvent, useCallback, useState } from 'react'
 import { ChatGPTAPI } from 'chatgpt'
 
 const preprompt =
@@ -34,10 +34,10 @@ const docFormat =
 `
 
 export default function Home() {
-  const [pageDoc, setPageDoc] = useState()
+  const [pageDoc, setPageDoc] = useState('')
   const [promptInput, setPromptInput] = useState('')
 
-  const submitPrompt = async (event: Event) => {
+  const submitPrompt = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // get and reset prompt
     const prompt = promptInput
@@ -68,10 +68,11 @@ export default function Home() {
     setPageDoc(formattedPageDoc)
   }
 
-  const updateIframeDoc = useCallback((iframeElement) => {
+  const updateIframeDoc = useCallback((iframeElement: HTMLIFrameElement) => {
     const frameGlobal = iframeElement.contentWindow
     console.log('preparing aiPrompt')
-    frameGlobal.aiPrompt = (newPrompt) => {
+    // @ts-ignore
+    frameGlobal.aiPrompt = (newPrompt: string) => {
       const accepted = confirm(`the ai prompt is:\n${newPrompt}`)
       if (accepted) {
         processPrompt(newPrompt)
@@ -90,7 +91,7 @@ export default function Home() {
       <iframe
         className={styles.iframe}
         srcDoc={pageDoc}
-        onLoad={(event) => updateIframeDoc(event.target)}
+        onLoad={(event) => updateIframeDoc(event.target as HTMLIFrameElement)}
       />
       
       <div className={styles.description}>
