@@ -34,6 +34,12 @@
   border-radius: var(--border-radius);
 }
 
+.iframe {
+  margin: 1rem 0;
+  flex-grow: 1;
+  width: 100%;
+}
+
 .code {
   font-weight: 700;
   font-family: var(--font-mono);
