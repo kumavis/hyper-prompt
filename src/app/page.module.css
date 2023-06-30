@@ -3,7 +3,7 @@
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 6rem;
+  padding: 2rem;
   min-height: 100vh;
 }
 
@@ -16,28 +16,25 @@
   width: 100%;
   z-index: 2;
   font-family: var(--font-mono);
-}
-
-.description a {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.description p {
-  position: relative;
-  margin: 0;
-  padding: 1rem;
-  background-color: rgba(var(--callout-rgb), 0.5);
-  border: 1px solid rgba(var(--callout-border-rgb), 0.3);
-  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
 }
 
 .iframe {
-  margin: 1rem 0;
   flex-grow: 1;
   width: 100%;
+}
+
+.promptInput {
+  width: 100%;
+}
+
+.promptInput form {
+  width: 100%;
+}
+
+.promptInput form input {
+  width: 100%;
+  font-size: 1rem;
 }
 
 .code {

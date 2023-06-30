@@ -15,6 +15,7 @@ You may use javascript to allow the user easily ask premade follow up questions.
 If your answer contains a list (<ol>), you should ALWAYS use \`aiPrompt\` to provide follow up questions digging deeper into the answer.
 For example, if the prompt is "how to fix a car", you may respond with "<ol><li><a href="javascript:aiPrompt('how to change the oil?')">change the oil"</a></li><li><a href="javascript:aiPrompt('how to change the tires?')">change the tires</a></li></ol>".
 Only call \`aiPrompt\` in response to a user interaction.
+When possible implement an interactive widget or animated simulation, draw a canvas image or diagram.
 
 In the html doc, respond to the following query:
 `
@@ -99,14 +100,16 @@ if (typeof self !== 'undefined') {
 }
 
 export default function Home() {
-  const [pageDoc, setPageDoc] = useState('')
+  const [currentPrompt, setCurrentPrompt] = useState('')
   const [promptInput, setPromptInput] = useState('')
+  const [pageDoc, setPageDoc] = useState('')
 
   const submitPrompt = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // get and reset prompt
     const prompt = promptInput
     setPromptInput('')
+    setCurrentPrompt(prompt)
     processPrompt(prompt)
   }
 
@@ -123,10 +126,11 @@ export default function Home() {
     const frameGlobal = iframeElement.contentWindow
     // @ts-ignore
     frameGlobal.aiPrompt = (newPrompt: string) => {
-      const accepted = confirm(`the ai prompt is:\n${newPrompt}`)
-      if (accepted) {
+      // const accepted = confirm(`the ai prompt is:\n${newPrompt}`)
+      // if (accepted) {
+        setCurrentPrompt(newPrompt)
         processPrompt(newPrompt)
-      }
+      // }
     }
   }, [])
 
@@ -138,17 +142,21 @@ export default function Home() {
         <h1 className={styles.title}>hyper prompt</h1>
       </div>
       
+      <div className={styles.promptInput}>
+        <form onSubmit={submitPrompt}>
+          <input
+            className={styles.input}
+            value={promptInput}
+            placeholder={currentPrompt}
+            onChange={(e) => setPromptInput(e.target.value)}
+          />
+        </form>
+      </div>
       <iframe
         className={styles.iframe}
         srcDoc={pageDoc}
         onLoad={(event) => updateIframeDoc(event.target as HTMLIFrameElement)}
       />
-      
-      <div className={styles.description}>
-        <form onSubmit={submitPrompt}>
-          <input className={styles.input} value={promptInput} onChange={(e) => setPromptInput(e.target.value)} />
-        </form>
-      </div>
 
     </main>
   )
