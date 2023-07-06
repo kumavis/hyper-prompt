@@ -1,7 +1,7 @@
 "use client"
 
 import styles from './page.module.css'
-import { FormEvent, useCallback, useState } from 'react'
+import { FormEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { ChatGPTAPI, ChatMessage } from 'chatgpt'
 
 const preprompt =
@@ -55,7 +55,7 @@ const configuration: Configuration = {}
 if (typeof self !== 'undefined') {
   const searchParams = new URLSearchParams(location.search)
   configuration.apiKey = searchParams.get('apiKey') || undefined
-  configuration.model = searchParams.get('model') || undefined
+  configuration.model = searchParams.get('model') || 'gpt-4'
   configuration.temperature = searchParams.get('temperature') || undefined
   configuration.top_p = searchParams.get('top_p') || undefined
 }
@@ -95,35 +95,45 @@ class Conversation {
     convo.messages = [...this.messages]
     return convo
   }
-} 
-
-let api: ChatGPTAPI
-let convo: Conversation
-// client only / no pre-rendering
-if (typeof self !== 'undefined') {
-  const { apiKey, model, temperature, top_p } = configuration
-  if (!apiKey || typeof apiKey !== 'string') throw new Error('apiKey not found in query string')
-  api = new ChatGPTAPI({
-    apiKey,
-    completionParams: {
-      model,
-      temperature: temperature ? parseFloat(temperature) : undefined,
-      top_p: top_p ? parseFloat(top_p) : undefined,
-    },
-    debug: true,
-    // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
-    fetch: self.fetch.bind(self),
-  })
-  // track messages
-  convo = new Conversation(api, {
-    systemMessage: preprompt,
-  })
 }
 
 export default function Home() {
   const [currentPrompt, setCurrentPrompt] = useState('')
   const [promptInput, setPromptInput] = useState('')
-  const [pageDoc, setPageDoc] = useState('')
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  const convo = useMemo(() => {
+    // client only / no pre-rendering
+    if (typeof self !== 'undefined') {
+      const { apiKey, model, temperature, top_p } = configuration
+      if (!apiKey || typeof apiKey !== 'string') throw new Error('apiKey not found in query string')
+      const api = new ChatGPTAPI({
+        apiKey,
+        completionParams: {
+          model,
+          ...(temperature && { temperature: parseFloat(temperature) }),
+          ...(top_p && { top_p: parseFloat(top_p) }),
+        },
+        debug: true,
+        // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
+        fetch: self.fetch.bind(self),
+      })
+      // track messages
+      return new Conversation(api, {
+        systemMessage: preprompt,
+        onProgress: (partialResponse) => {
+          if (!partialResponse.delta) return
+          console.log(`got response partial`, partialResponse)
+          if (!frameRef.current) {
+            console.error('missing iframe ref!')
+            return
+          }
+          const frame = frameRef.current
+          frame.contentWindow?.document.write(partialResponse.delta)
+        },
+      })
+    }
+  }, [])
 
   const submitPrompt = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -137,24 +147,24 @@ export default function Home() {
   const processPrompt = async (prompt: string) => {
     // ask ai
     console.log(`prompt: ${prompt}`)
+    if (!convo) throw new Error('missing convo')
+    const [docStart, docEnd] = docFormat.split('__RESPONSE__')
+    frameRef.current?.contentWindow?.document.open()
+    frameRef.current?.contentWindow?.document.write(docStart)
     const res = await convo.sendMessage(prompt)
-    // format response
-    const formattedPageDoc = docFormat.replace('__RESPONSE__', res.text)
-    setPageDoc(formattedPageDoc)
+    console.log('prompt response complete', res)
+    frameRef.current?.contentWindow?.document.write(docEnd)
+    frameRef.current?.contentWindow?.document.close()
   }
 
   const updateIframeDoc = useCallback((iframeElement: HTMLIFrameElement) => {
     const frameGlobal = iframeElement.contentWindow
     // @ts-ignore
     frameGlobal.aiPrompt = (newPrompt: string) => {
-      // const accepted = confirm(`the ai prompt is:\n${newPrompt}`)
-      // if (accepted) {
-        setCurrentPrompt(newPrompt)
-        processPrompt(newPrompt)
-      // }
+      setCurrentPrompt(newPrompt)
+      processPrompt(newPrompt)
     }
   }, [])
-
 
   return (
     <main className={styles.main}>
@@ -175,7 +185,10 @@ export default function Home() {
       </div>
       <iframe
         className={styles.iframe}
-        srcDoc={pageDoc}
+        ref={frameRef}
+        // this should create a fresh frame for each prompt,
+        // avoiding issues like persistent global variables (?)
+        key={currentPrompt}
         onLoad={(event) => updateIframeDoc(event.target as HTMLIFrameElement)}
       />
 
