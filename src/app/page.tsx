@@ -42,6 +42,24 @@ const docFormat =
 </html>
 `
 
+type Configuration = {
+  apiKey?: string,
+  model?: string,
+  temperature?: string,
+  top_p?: string,
+}
+
+const configuration: Configuration = {}
+
+// client only / no pre-rendering
+if (typeof self !== 'undefined') {
+  const searchParams = new URLSearchParams(location.search)
+  configuration.apiKey = searchParams.get('apiKey') || undefined
+  configuration.model = searchParams.get('model') || undefined
+  configuration.temperature = searchParams.get('temperature') || undefined
+  configuration.top_p = searchParams.get('top_p') || undefined
+}
+
 type RequestResponsePair = {
   request: string,
   response?: ChatMessage,
@@ -83,14 +101,14 @@ let api: ChatGPTAPI
 let convo: Conversation
 // client only / no pre-rendering
 if (typeof self !== 'undefined') {
-  const apiKey = new URLSearchParams(location.search).get('apiKey')
-  if (!apiKey) throw new Error('apiKey not found in query string')
+  const { apiKey, model, temperature, top_p } = configuration
+  if (!apiKey || typeof apiKey !== 'string') throw new Error('apiKey not found in query string')
   api = new ChatGPTAPI({
     apiKey,
     completionParams: {
-      model: 'gpt-4',
-      // temperature: 0.5,
-      // top_p: 0.8
+      model,
+      temperature: temperature ? parseFloat(temperature) : undefined,
+      top_p: top_p ? parseFloat(top_p) : undefined,
     },
     debug: true,
     // workaround for https://github.com/transitive-bullshit/chatgpt-api/issues/592
