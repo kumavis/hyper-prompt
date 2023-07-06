@@ -150,11 +150,24 @@ export default function Home() {
     console.log(`prompt: ${prompt}`)
     if (!convo) throw new Error('missing convo')
     const [docStart, docEnd] = docFormat.split('__RESPONSE__')
-    frameRef.current?.contentWindow?.document.open()
-    frameRef.current?.contentWindow?.document.write(docStart)
+    let initialized = false
     const res = await convo.sendMessage(prompt, (partialResponse) => {
-      if (!convo) throw new Error('missing convo')
+      const frame = frameRef.current
+      if (!frame) throw new Error('missing document body')
+      if (!frame.contentWindow) throw new Error('missing contentWindow')
+      // initialize once. we do this here to ensure the iframe element is
+      // the correct one. previously it was the previous prompts frame
+      if (!initialized) {
+        initialized = true
+        frame.contentWindow.document.open()
+        // somehow docStart getting blown away during streaming updates?
+        // i think the issue is the iframe is getting replaced (by setting key=)
+        // but this first part runs before the iframe is replaced
+        frame.contentWindow.document.write(docStart)
+      }
+      // ignore if no content
       if (!partialResponse.delta) return
+      // drop update if the prompt has changed
       if (prompt !== currentPromptRef.current) {
         console.log('prompt mismatch', {
           prompt,
@@ -162,18 +175,16 @@ export default function Home() {
         })
         return
       }
+      // append update
       console.log(`got response partial`)
-      if (!frameRef.current) {
-        console.error('missing iframe ref!')
-        return
-      }
-
-      const frame = frameRef.current
-      frame.contentWindow?.document.write(partialResponse.delta)
+      frame.contentWindow.document.write(partialResponse.delta)
     })
     console.log('prompt response complete', res)
-    frameRef.current?.contentWindow?.document.write(docEnd)
-    frameRef.current?.contentWindow?.document.close()
+    const frame = frameRef.current
+    if (!frame) throw new Error('missing document body')
+    if (!frame.contentWindow) throw new Error('missing contentWindow')
+    frame.contentWindow.document.write(docEnd)
+    frame.contentWindow.document.close()
     setLoading(false)
   }
 
