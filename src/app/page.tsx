@@ -3,7 +3,7 @@
 import styles from './page.module.css'
 import { FormEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { ChatGPTAPI, ChatMessage } from 'chatgpt'
-
+import type { SendMessageOptions } from 'chatgpt'
 const preprompt =
 `
 Respond only with a single HTML fragment to be placed inside a <body>.
@@ -63,24 +63,30 @@ if (typeof self !== 'undefined') {
 type RequestResponsePair = {
   request: string,
   response?: ChatMessage,
+  parentMessageId?: string,
 }
 
 class Conversation {
   api: ChatGPTAPI
-  requestOpts?: object
+  requestOpts?: SendMessageOptions
   messages: RequestResponsePair[] = []
 
-  constructor (api: ChatGPTAPI, requestOpts?: object) {
+  constructor (api: ChatGPTAPI, requestOpts?: SendMessageOptions) {
     this.api = api
     this.requestOpts = requestOpts
   }
 
-  async sendMessage (message: string) {
-    const thisMessagePair: RequestResponsePair = { request: message }
+  async sendMessage (message: string, onProgress?: (partialResponse: ChatMessage) => void) {
+    const parentMessageId = this.lastMessage?.response?.id
+    const thisMessagePair: RequestResponsePair = { request: message, parentMessageId }
     this.messages.push(thisMessagePair)
     const response = await this.api.sendMessage(message, {
       ...this.requestOpts,
-      parentMessageId: this.lastMessage?.response?.id,
+      parentMessageId,
+      onProgress: (partialResponse) => {
+        thisMessagePair.response = partialResponse
+        onProgress?.(partialResponse)
+      }
     })
     thisMessagePair.response = response
     return response
@@ -99,7 +105,9 @@ class Conversation {
 
 export default function Home() {
   const [currentPrompt, setCurrentPrompt] = useState('')
+  const currentPromptRef = useRef(currentPrompt)
   const [promptInput, setPromptInput] = useState('')
+  const [isLoading, setLoading] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null);
 
   const convo = useMemo(() => {
@@ -121,16 +129,6 @@ export default function Home() {
       // track messages
       return new Conversation(api, {
         systemMessage: preprompt,
-        onProgress: (partialResponse) => {
-          if (!partialResponse.delta) return
-          console.log(`got response partial`, partialResponse)
-          if (!frameRef.current) {
-            console.error('missing iframe ref!')
-            return
-          }
-          const frame = frameRef.current
-          frame.contentWindow?.document.write(partialResponse.delta)
-        },
       })
     }
   }, [])
@@ -141,6 +139,9 @@ export default function Home() {
     const prompt = promptInput
     setPromptInput('')
     setCurrentPrompt(prompt)
+    currentPromptRef.current = prompt
+    setLoading(true)
+    // run prompt
     processPrompt(prompt)
   }
 
@@ -151,10 +152,29 @@ export default function Home() {
     const [docStart, docEnd] = docFormat.split('__RESPONSE__')
     frameRef.current?.contentWindow?.document.open()
     frameRef.current?.contentWindow?.document.write(docStart)
-    const res = await convo.sendMessage(prompt)
+    const res = await convo.sendMessage(prompt, (partialResponse) => {
+      if (!convo) throw new Error('missing convo')
+      if (!partialResponse.delta) return
+      if (prompt !== currentPromptRef.current) {
+        console.log('prompt mismatch', {
+          prompt,
+          currentPrompt: currentPromptRef.current,
+        })
+        return
+      }
+      console.log(`got response partial`)
+      if (!frameRef.current) {
+        console.error('missing iframe ref!')
+        return
+      }
+
+      const frame = frameRef.current
+      frame.contentWindow?.document.write(partialResponse.delta)
+    })
     console.log('prompt response complete', res)
     frameRef.current?.contentWindow?.document.write(docEnd)
     frameRef.current?.contentWindow?.document.close()
+    setLoading(false)
   }
 
   const updateIframeDoc = useCallback((iframeElement: HTMLIFrameElement) => {
@@ -175,6 +195,12 @@ export default function Home() {
       
       <div className={styles.promptInput}>
         <form onSubmit={submitPrompt}>
+          <button
+            className={styles.loadingIcon}
+            disabled={isLoading}
+          >
+            {isLoading ? '%' : '>'}
+          </button>
           <input
             className={styles.input}
             value={promptInput}
